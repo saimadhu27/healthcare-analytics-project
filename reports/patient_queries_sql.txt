@@ -1,0 +1,75 @@
+USE patient_data;
+
+----------- 1 ques ------------------
+-- get patient_ids from engagement and appointments
+-- merge and select distinct patient ids
+WITH last_90d AS (
+  SELECT patient_id
+  FROM engagement
+  WHERE date >= CURRENT_DATE - INTERVAL 90 DAY
+  
+  UNION 
+  
+  SELECT patient_id
+  FROM appointments
+  WHERE scheduled_date >= CURRENT_DATE - INTERVAL 90 DAY
+)
+SELECT COUNT(DISTINCT patient_id) AS active_patients_90d
+FROM last_90d;
+
+-------------- 2 ques ----------------
+-- count(N)/total_appointments
+-- group by provider
+
+SELECT provider_type, 
+	ROUND((SUM(CASE WHEN attended_flag = 'N' THEN 1 ELSE 0 END) / COUNT(*))*100, 2) as no_show_percentage
+FROM appointments
+GROUP BY provider_type;
+
+----------------- 3 ques ---------------------
+-- filter for patients who have >= 1 in the last 30 days
+-- find avg actions per patient
+
+-- there are no patients who made appointment in the last 30 days.
+-- So i considered last 60 days instead of 30.
+WITH patients_grt_1app AS (
+  SELECT DISTINCT patient_id
+  FROM appointments
+  WHERE scheduled_date >= CURDATE() - INTERVAL 60 DAY
+)
+SELECT e.patient_id,
+	ROUND(SUM(e.action_count)/COUNT(e.patient_id), 2) AS avg_actions_per_user
+FROM engagement as e
+INNER JOIN patients_grt_1app as p 
+ON e.patient_id = p.patient_id
+GROUP BY e.patient_id;
+
+
+----------- 4 ques -----------------
+-- select first app from appointments
+-- join with patients and find the difference
+-- get top 10
+
+WITH app AS(SELECT patient_id,
+	MIN(scheduled_date) as first_app
+FROM appointments
+GROUP BY patient_id),
+gaps AS(SELECT p.patient_id,
+	DATEDIFF(a.first_app, p.signup_date) AS gap_days
+FROM patients as p
+INNER JOIN app as a
+ON p.patient_id = a.patient_id)
+
+SELECT *
+FROM gaps
+ORDER BY gap_days DESC
+LIMIT 10;
+
+
+
+
+
+
+
+
+
